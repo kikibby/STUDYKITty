@@ -52,6 +52,26 @@ export default function SellPage() {
     // keep the same product selected for convenience when selling multiple items in a row
   }
 
+  // ---------------- Telegram notification (fire-and-forget) ----------------
+  // เรียกผ่าน API Route ฝั่ง Server (/api/telegram) เพื่อไม่ให้ Bot Token หลุดไปฝั่งเบราว์เซอร์
+  // ถ้าส่งไม่สำเร็จจะแค่ log ลง console และไม่กระทบการขาย
+
+  async function notifyTelegram(payload) {
+    try {
+      const res = await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        console.error('Telegram notification failed:', res.status, await res.text());
+      }
+    } catch (err) {
+      // ห้าม throw ออกไป เพื่อไม่ให้กระทบการขาย
+      console.error('Telegram notification error:', err);
+    }
+  }
+
   // ---------------- Handle sale ----------------
 
   async function handleSell(e) {
@@ -110,6 +130,16 @@ export default function SellPage() {
       });
       return;
     }
+
+    // 3) ตัดสต๊อกสำเร็จแล้ว -> ส่งแจ้งเตือน Telegram
+    //    (ไม่ await เพื่อไม่ให้หน้าเว็บช้า และถ้าพลาดก็ไม่กระทบการแจ้งขายสำเร็จ)
+    notifyTelegram({
+      productName: selectedProduct.name,
+      quantity: parsedQuantity,
+      totalPrice,
+      stockAfter: newStock,
+      unit: selectedProduct.unit,
+    });
 
     setStatusMsg({
       type: 'success',
